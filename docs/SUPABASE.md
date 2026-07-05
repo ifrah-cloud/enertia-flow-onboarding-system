@@ -1,219 +1,181 @@
-# Supabase Database Reference
+Supabase Database Reference
 
-This document covers every table, column, and SQL statement needed to set up the database from scratch.
+The onboarding platform uses four database tables to store client progress, conversations, and custom service requests. Each table has a single responsibility, making the system easy to maintain and scale.
+| Table                 | Purpose                                                                                                                    |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **clients**           | Stores each client's profile, onboarding progress, XP, and account information.                                            |
+| **help_messages**     | Stores all conversations between clients and your team, including both general support and checklist-specific discussions. |
+| **pipeline_requests** | Stores custom pipeline requests submitted through the Pipeline Simulator.                                                  |
+| **workflow_requests** | Stores custom workflow and automation requests submitted through the Workflow Simulator.                                   |
+Clients
 
----
+The Clients table is the primary data source for the onboarding platform. Every client who accesses the portal has a single record in this table.
 
-## Overview
+Stores
+Client name
+Email address
+Role or company
+Overall onboarding progress
+Experience points (XP)
+Current onboarding status
+Completed checklist items
+GoHighLevel Location ID
+Login history
+Completion status
+How the platform uses it
 
-| Table | Purpose |
-|---|---|
-| `clients` | One row per client. Stores login info, checklist progress, XP, status. |
-| `help_messages` | Every message in every conversation thread — per-step help and general inbox. |
-| `pipeline_requests` | Custom pipeline build requests submitted by clients via the simulator form. |
-| `workflow_requests` | Custom workflow/automation build requests submitted via the simulator form. |
+When a client opens the onboarding portal for the first time, a record is automatically created if one doesn't already exist.
 
----
+Each time the client completes a checklist item, the system updates:
 
-## SQL Block 1 — clients table
+Progress percentage
+XP
+Checklist completion
+Current onboarding status
 
-Run this first.
+The dashboard reads this table to display client progress, completion percentages, leaderboard data, and onboarding statistics.
 
-```sql
-create table public.clients (
-  id uuid default gen_random_uuid() primary key,
-  email text unique not null,
-  name text,
-  role text default 'Client',
-  progress int8 default 0,
-  xp int8 default 0,
-  status text default 'Initializing',
-  completed_items jsonb default '[]'::jsonb,
-  completed boolean default false,
-  location_id text,
-  last_login timestamptz,
-  login_count int8 default 0,
-  created_at timestamptz default now()
-);
+Important Fields
+Email
 
--- Row level security (open policy — anon key has full access)
-alter table clients enable row level security;
-create policy "Allow all on clients" on clients for all using (true) with check (true);
+The email address uniquely identifies every client throughout the application.
 
--- Index for fast email lookups
-create index if not exists idx_clients_email on clients (email);
-```
+All progress, conversations, and request history are associated with this email address.
 
----
+Recommendation: Avoid changing a client's email after onboarding has started unless all related records are updated as well.
 
-## SQL Block 2 — help_messages table
+Completed Items
 
-Run this second.
+Stores every completed checklist item.
 
-```sql
-create table public.help_messages (
-  id bigint generated always as identity not null,
-  client_email text not null,
-  item_id text not null,
-  sender text not null,
-  message text not null,
-  created_at timestamp with time zone default now(),
-  read_by_team boolean default false,
-  read_by_client boolean default false,
-  constraint help_messages_pkey primary key (id),
-  constraint help_messages_sender_check check (
-    sender = any (array['client'::text, 'team'::text])
-  )
-);
+The onboarding checklist uses this information to restore progress whenever the client logs back in.
 
--- Row level security
-alter table help_messages enable row level security;
-create policy "Allow all on help_messages" on help_messages for all using (true) with check (true);
+If this data is missing, the client will appear to have no completed progress.
 
--- Index for fast client+item lookups
-create index if not exists idx_help_messages_lookup
-  on help_messages using btree (client_email, item_id);
-```
+Progress
 
-**Important:** `item_id` is either a checklist item ID (e.g. `p1`, `ph3`) for per-step threads, or the reserved value `'general'` for the client's inbox thread. Every client has one `general` thread and potentially one thread per checklist item they've asked about.
+Represents overall onboarding completion as a percentage between 0 and 100.
 
----
+The application automatically recalculates this value whenever checklist progress changes.
 
-## SQL Block 3 — pipeline_requests and workflow_requests tables
+Location ID
 
-Run this third.
+Stores the client's GoHighLevel Location ID.
 
-```sql
--- Pipeline requests
-create table if not exists public.pipeline_requests (
-  id bigint generated always as identity not null,
-  client_email text not null,
-  client_name text not null,
-  pipeline_name text not null,
-  stages text not null,
-  description text,
-  status text not null default 'pending',
-  created_at timestamp with time zone default now(),
-  constraint pipeline_requests_pkey primary key (id),
-  constraint pipeline_requests_status_check check (
-    status = any (array['pending','in_progress','done'])
-  )
-);
+This is captured automatically from the onboarding URL during the client's first visit and is later used to generate direct links back into their GoHighLevel account.
 
--- Workflow requests
-create table if not exists public.workflow_requests (
-  id bigint generated always as identity not null,
-  client_email text not null,
-  client_name text not null,
-  workflow_name text not null,
-  trigger_event text not null,
-  actions text not null,
-  description text,
-  status text not null default 'pending',
-  created_at timestamp with time zone default now(),
-  constraint workflow_requests_pkey primary key (id),
-  constraint workflow_requests_status_check check (
-    status = any (array['pending','in_progress','done'])
-  )
-);
+If no Location ID exists, features that rely on deep-linking to GoHighLevel are automatically hidden.
 
--- Row level security
-alter table pipeline_requests enable row level security;
-alter table workflow_requests enable row level security;
-create policy "Allow all on pipeline_requests" on pipeline_requests for all using (true) with check (true);
-create policy "Allow all on workflow_requests" on workflow_requests for all using (true) with check (true);
+Help Messages
 
--- Indexes
-create index if not exists idx_pipeline_requests_email on pipeline_requests (client_email);
-create index if not exists idx_workflow_requests_email on workflow_requests (client_email);
-```
+The Help Messages table stores every conversation between clients and your internal team.
 
----
+Rather than creating separate tables for different conversation types, the system stores everything in one place.
 
-## Column Reference
+Conversation Types
 
-### clients
+The platform supports two kinds of conversations:
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | uuid | Auto-generated primary key |
-| `email` | text | Unique. Used as the lookup key everywhere. |
-| `name` | text | Client's full name |
-| `role` | text | e.g. "Client", "CEO @ Acme" — optional, from login form |
-| `progress` | int8 | 0–100. Calculated from completed_items / total items |
-| `xp` | int8 | Gamification points. Accumulates as items are checked |
-| `status` | text | "Initializing" → "Booting Up" → "Calibrating" → "Fully Operational" |
-| `completed_items` | jsonb | Array of item IDs the client has checked e.g. `["p1","p2","ph1"]` |
-| `completed` | boolean | true when progress = 100 |
-| `location_id` | text | GHL sub-account location ID. Passed from menu link URL param. Used to build the pipeline deep link. |
-| `last_login` | timestamptz | Updated on every login |
-| `login_count` | int8 | How many times this client has logged in |
-| `created_at` | timestamptz | Auto-set on insert |
+General Support
 
-### help_messages
+A dedicated inbox where clients can ask questions unrelated to a specific onboarding task.
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | Auto-increment primary key |
-| `client_email` | text | Foreign key to clients.email (soft reference) |
-| `item_id` | text | Checklist item ID or `'general'` for inbox |
-| `sender` | text | `'client'` or `'team'` — enforced by check constraint |
-| `message` | text | The message content |
-| `created_at` | timestamptz | Auto-set on insert |
-| `read_by_team` | boolean | Set to true when team opens the message thread |
-| `read_by_client` | boolean | Set to true when client opens the message thread |
+Checklist Support
 
-### pipeline_requests
+Each checklist item can have its own conversation thread.
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | Auto-increment primary key |
-| `client_email` | text | Who submitted the request |
-| `client_name` | text | Denormalized for easy display without joins |
-| `pipeline_name` | text | What the client wants the pipeline called |
-| `stages` | text | Comma-separated stage names |
-| `description` | text | Optional extra context |
-| `status` | text | `pending` → `in_progress` → `done` |
-| `created_at` | timestamptz | Auto-set on insert |
+For example:
 
-### workflow_requests
+Domain Setup
+DNS Configuration
+Website Review
+Workflow Questions
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | Auto-increment primary key |
-| `client_email` | text | Who submitted the request |
-| `client_name` | text | Denormalized for easy display |
-| `workflow_name` | text | What the client wants the workflow called |
-| `trigger_event` | text | What starts the workflow (client's description) |
-| `actions` | text | What the workflow should do (client's description) |
-| `description` | text | Optional extra context |
-| `status` | text | `pending` → `in_progress` → `done` |
-| `created_at` | timestamptz | Auto-set on insert |
+This keeps conversations organized and directly attached to the relevant onboarding step.
 
----
+Read Status
 
-## Checking Your Tables Are Set Up Correctly
+Each conversation tracks whether it has been viewed by:
 
-Run this in the SQL Editor to verify all four tables exist:
+The client
+Your team
 
-```sql
-select table_name
-from information_schema.tables
-where table_schema = 'public'
-  and table_name in ('clients','help_messages','pipeline_requests','workflow_requests')
-order by table_name;
-```
+This allows the application to display unread indicators throughout both the client portal and the admin dashboard.
 
-You should see all four table names returned.
+Pipeline Requests
 
----
+The Pipeline Requests table stores custom CRM pipeline requests submitted through the Pipeline Simulator.
 
-## Resetting All Data (for testing)
+Each request includes information such as:
 
-Run this to wipe all client data without dropping the tables:
+Client details
+Requested pipeline
+Stage structure
+Description
+Current request status
+Submission date
 
-```sql
-truncate table help_messages, pipeline_requests, workflow_requests, clients restart identity cascade;
-```
+The internal dashboard uses this table to manage implementation progress.
 
-**Do not run this in production.** Test environments only.
+Request Status
+
+Each request progresses through one of three stages:
+
+Pending
+In Progress
+Completed
+
+These statuses are used by the dashboard to organize work and monitor outstanding requests.
+
+Workflow Requests
+
+The Workflow Requests table functions similarly to Pipeline Requests but is dedicated to automation requests.
+
+Each submission contains:
+
+Client information
+Workflow name
+Trigger details
+Requested automation actions
+Additional notes
+Current implementation status
+
+This allows your team to manage automation requests separately from pipeline work while maintaining a consistent workflow.
+
+Dashboard Integration
+
+The dashboard combines information from all four tables to provide a complete overview of each client.
+
+This includes:
+
+Onboarding progress
+XP
+Completion status
+Support conversations
+Pipeline requests
+Workflow requests
+Overall onboarding activity
+
+Because each table has a clearly defined responsibility, the dashboard can efficiently retrieve only the information required for each section.
+
+Data Relationships
+
+Although the database is intentionally lightweight, the tables are connected through the client's email address.
+Client
+   │
+   ├── Progress
+   ├── Help Messages
+   ├── Pipeline Requests
+   └── Workflow Requests
+   Development Notes
+
+The application expects these four tables to exist before deployment.
+
+Once they are configured:
+
+Client accounts are created automatically during first login.
+Progress is saved in real time.
+Support conversations are synchronized automatically.
+Pipeline and workflow requests are available immediately from the admin dashboard.
+
+No additional database configuration is required during normal operation. The application manages all ongoing reads and updates automatically.
