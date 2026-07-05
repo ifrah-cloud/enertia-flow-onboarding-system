@@ -1,181 +1,251 @@
-Supabase Database Reference
+# Supabase Database Reference
 
-The onboarding platform uses four database tables to store client progress, conversations, and custom service requests. Each table has a single responsibility, making the system easy to maintain and scale.
-| Table                 | Purpose                                                                                                                    |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| **clients**           | Stores each client's profile, onboarding progress, XP, and account information.                                            |
-| **help_messages**     | Stores all conversations between clients and your team, including both general support and checklist-specific discussions. |
-| **pipeline_requests** | Stores custom pipeline requests submitted through the Pipeline Simulator.                                                  |
-| **workflow_requests** | Stores custom workflow and automation requests submitted through the Workflow Simulator.                                   |
-Clients
+The onboarding platform uses **four database tables** to store client progress, conversations, and custom service requests. Each table has a single responsibility, making the system easy to maintain and scale.
 
-The Clients table is the primary data source for the onboarding platform. Every client who accesses the portal has a single record in this table.
+---
 
-Stores
-Client name
-Email address
-Role or company
-Overall onboarding progress
-Experience points (XP)
-Current onboarding status
-Completed checklist items
-GoHighLevel Location ID
-Login history
-Completion status
-How the platform uses it
+# Database Overview
 
-When a client opens the onboarding portal for the first time, a record is automatically created if one doesn't already exist.
+| Table | Purpose |
+|--------|---------|
+| **clients** | Stores each client's profile, onboarding progress, XP, and account information. |
+| **help_messages** | Stores all conversations between clients and your team, including both general support and checklist-specific discussions. |
+| **pipeline_requests** | Stores custom pipeline requests submitted through the Pipeline Simulator. |
+| **workflow_requests** | Stores custom workflow and automation requests submitted through the Workflow Simulator. |
 
-Each time the client completes a checklist item, the system updates:
+---
 
-Progress percentage
-XP
-Checklist completion
-Current onboarding status
+# Clients
 
-The dashboard reads this table to display client progress, completion percentages, leaderboard data, and onboarding statistics.
+The **Clients** table serves as the primary data source for the onboarding platform. Every client who accesses the portal has a single record in this table.
 
-Important Fields
-Email
+## Stored Information
 
-The email address uniquely identifies every client throughout the application.
+- Client name
+- Email address
+- Role or company
+- Overall onboarding progress
+- Experience Points (XP)
+- Current onboarding status
+- Completed checklist items
+- GoHighLevel Location ID
+- Login history
+- Completion status
 
-All progress, conversations, and request history are associated with this email address.
+## How It's Used
 
-Recommendation: Avoid changing a client's email after onboarding has started unless all related records are updated as well.
+When a client accesses the onboarding portal for the first time, the application automatically creates a client record if one does not already exist.
 
-Completed Items
+Whenever a checklist item is completed, the application updates:
+
+- Progress percentage
+- XP
+- Completed checklist items
+- Current onboarding status
+
+The admin dashboard reads this table to display:
+
+- Client progress
+- Completion percentage
+- XP leaderboard
+- Onboarding statistics
+- Client activity
+
+---
+
+## Key Fields
+
+### Email
+
+The email address is the application's unique identifier for each client.
+
+All progress, conversations, and request history are associated with the client's email address.
+
+> **Best Practice**
+>
+> Avoid changing a client's email after onboarding has started unless all related records are updated.
+
+---
+
+### Completed Items
 
 Stores every completed checklist item.
 
-The onboarding checklist uses this information to restore progress whenever the client logs back in.
+The checklist loads this information whenever a client signs in, allowing them to continue exactly where they left off.
 
-If this data is missing, the client will appear to have no completed progress.
+If this information is missing, completed progress cannot be restored.
 
-Progress
+---
 
-Represents overall onboarding completion as a percentage between 0 and 100.
+### Progress
+
+Stores the client's onboarding completion percentage.
 
 The application automatically recalculates this value whenever checklist progress changes.
 
-Location ID
+Expected range:
+
+- Minimum: **0**
+- Maximum: **100**
+
+---
+
+### Location ID
 
 Stores the client's GoHighLevel Location ID.
 
-This is captured automatically from the onboarding URL during the client's first visit and is later used to generate direct links back into their GoHighLevel account.
+This value is automatically captured from the onboarding URL during the client's first visit.
 
-If no Location ID exists, features that rely on deep-linking to GoHighLevel are automatically hidden.
+It is later used to generate direct links back into the client's GoHighLevel account.
 
-Help Messages
+If no Location ID exists, GoHighLevel deep-link functionality is automatically hidden.
 
-The Help Messages table stores every conversation between clients and your internal team.
+---
 
-Rather than creating separate tables for different conversation types, the system stores everything in one place.
+# Help Messages
 
-Conversation Types
+The **Help Messages** table stores every conversation between clients and your internal team.
 
-The platform supports two kinds of conversations:
+Instead of creating multiple messaging tables, all conversations are stored here.
 
-General Support
+---
 
-A dedicated inbox where clients can ask questions unrelated to a specific onboarding task.
+## Conversation Types
 
-Checklist Support
+### General Support
+
+A dedicated support inbox for questions unrelated to a specific onboarding task.
+
+---
+
+### Checklist Support
 
 Each checklist item can have its own conversation thread.
 
-For example:
+Examples include:
 
-Domain Setup
-DNS Configuration
-Website Review
-Workflow Questions
+- Website Setup
+- DNS Configuration
+- CRM Configuration
+- Workflow Questions
+- Funnel Questions
 
-This keeps conversations organized and directly attached to the relevant onboarding step.
+This keeps conversations organized and directly associated with the relevant onboarding step.
 
-Read Status
+---
 
-Each conversation tracks whether it has been viewed by:
+## Read Status
 
-The client
-Your team
+Every conversation tracks whether it has been viewed by:
 
-This allows the application to display unread indicators throughout both the client portal and the admin dashboard.
+- The client
+- Your team
 
-Pipeline Requests
+These values allow the platform to display unread notifications throughout both the client portal and the admin dashboard.
 
-The Pipeline Requests table stores custom CRM pipeline requests submitted through the Pipeline Simulator.
+---
 
-Each request includes information such as:
+# Pipeline Requests
 
-Client details
-Requested pipeline
-Stage structure
-Description
-Current request status
-Submission date
+The **Pipeline Requests** table stores custom CRM pipeline requests submitted through the Pipeline Simulator.
 
-The internal dashboard uses this table to manage implementation progress.
+Each request contains:
 
-Request Status
+- Client information
+- Pipeline name
+- Requested stages
+- Description
+- Current status
+- Submission date
 
-Each request progresses through one of three stages:
+The admin dashboard uses this table to manage implementation progress.
 
-Pending
-In Progress
-Completed
+---
 
-These statuses are used by the dashboard to organize work and monitor outstanding requests.
+## Request Status
 
-Workflow Requests
+Each request moves through one of three stages:
 
-The Workflow Requests table functions similarly to Pipeline Requests but is dedicated to automation requests.
+- Pending
+- In Progress
+- Completed
 
-Each submission contains:
+These statuses allow the dashboard to organize active work and completed requests.
 
-Client information
-Workflow name
-Trigger details
-Requested automation actions
-Additional notes
-Current implementation status
+---
 
-This allows your team to manage automation requests separately from pipeline work while maintaining a consistent workflow.
+# Workflow Requests
 
-Dashboard Integration
+The **Workflow Requests** table stores custom workflow and automation requests submitted through the Workflow Simulator.
 
-The dashboard combines information from all four tables to provide a complete overview of each client.
+Each request includes:
+
+- Client information
+- Workflow name
+- Trigger event
+- Requested automation actions
+- Additional notes
+- Current status
+- Submission date
+
+Keeping workflow requests separate from pipeline requests allows each service to be managed independently while maintaining a consistent user experience.
+
+---
+
+# Dashboard Integration
+
+The admin dashboard combines information from all four tables to provide a complete overview of every client.
 
 This includes:
 
-Onboarding progress
-XP
-Completion status
-Support conversations
-Pipeline requests
-Workflow requests
-Overall onboarding activity
+- Onboarding progress
+- XP
+- Completion status
+- Support conversations
+- Pipeline requests
+- Workflow requests
+- Overall onboarding activity
 
 Because each table has a clearly defined responsibility, the dashboard can efficiently retrieve only the information required for each section.
 
-Data Relationships
+---
 
-Although the database is intentionally lightweight, the tables are connected through the client's email address.
+# Data Relationships
+
+Although the database is intentionally lightweight, every table is connected through the client's email address.
+
+```text
 Client
    │
    ├── Progress
    ├── Help Messages
    ├── Pipeline Requests
    └── Workflow Requests
-   Development Notes
+```
 
-The application expects these four tables to exist before deployment.
+This approach keeps the data model simple while ensuring all client activity remains connected.
 
-Once they are configured:
+---
 
-Client accounts are created automatically during first login.
-Progress is saved in real time.
-Support conversations are synchronized automatically.
-Pipeline and workflow requests are available immediately from the admin dashboard.
+# Application Behavior
 
-No additional database configuration is required during normal operation. The application manages all ongoing reads and updates automatically.
+Once these four tables exist, the application automatically manages all database operations.
+
+This includes:
+
+- Creating new client records
+- Updating onboarding progress
+- Saving checklist completion
+- Managing support conversations
+- Recording pipeline requests
+- Recording workflow requests
+
+No manual database maintenance is required during normal operation.
+
+---
+
+# Summary
+
+The onboarding platform uses a lightweight relational structure that separates client information, conversations, and service requests into dedicated tables.
+
+This architecture keeps the application scalable, easy to maintain, and optimized for future expansion while providing the dashboard with everything it needs to manage the client onboarding experience.
