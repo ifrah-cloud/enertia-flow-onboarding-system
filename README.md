@@ -51,10 +51,26 @@ At 10 new clients a month, that's 15 hours back. At 50, it's a part-time role el
 How It Works
 ---
 
-## What This System Does
-
-When a new client is added to GHL, they click a menu link inside their sub-account that takes them to the onboarding portal. They fill in their details, work through a checklist of setup tasks, and can request help or submit custom pipeline/workflow builds directly from the portal. Your internal team sees all of this live in a dashboard and can reply to clients, manage requests, and track completion.
-
+## How It Works
+ 
+### Client journey
+ 
+```
+Client gets GHL sub-account
+        ↓
+Clicks "Client Onboarding Portal" in GHL sidebar
+        ↓
+Lands on portal — name and email pre-filled from GHL
+        ↓
+Completes checklist (Profile → Phone → Contacts → Pipeline)
+        ↓
+Asks help questions inline if stuck
+        ↓
+Requests custom pipeline or workflow via simulator forms
+        ↓
+Hits 100% → GHL notifies the whole team automatically
+```
+ 
 ---
 
 ## Architecture
@@ -64,31 +80,27 @@ GHL Sub-Account (client clicks menu link)
         │
         │  URL params: ?location=xxx&email=xxx&name=xxx
         ▼
-Onboarding Portal  (onboarding.enertiaflow.com)
-  ├── ClientLogin.tsx       — captures client details, creates Supabase row
-  ├── GamifiedChecklist.tsx — checklist, help panels, simulators, inbox
-  └── store.ts              — all Supabase + webhook logic
+Onboarding Portal  
+  ├──  captures client details, creates Supabase row
+  ├──  checklist, help panels, simulators, inbox
+  └──  all Supabase + webhook logic
         │
         │  REST API writes
         ▼
 Supabase Database
-  ├── clients               — one row per client, tracks progress + XP
-  ├── help_messages         — all chat messages (per-step + general inbox)
-  ├── pipeline_requests     — custom pipeline build requests
-  └── workflow_requests     — custom workflow build requests
+  ├── clients               
+  ├── help_messages         
+  ├── pipeline_requests     
+  └── workflow_requests     
         │
-        ├── read by Dashboard.tsx (team's live view, polls every 30s)
+        ├── team's live view, polls every 30s
         │
         └── webhooks fire to GHL on:
-              • Client sends a help message   → HELP webhook
-              • Pipeline request submitted    → HELP webhook
-              • Workflow request submitted    → HELP webhook
-              • Checklist hits 100%           → COMPLETION webhook
                       │
                       ▼
               GHL Workflows
                 ├── Send email to client (confirmation)
-                └── Notify internal team (ifrah, ayesha, sean)
+                └── Notify internal team
 ```
 
 ---
