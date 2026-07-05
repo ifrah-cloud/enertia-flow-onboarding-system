@@ -48,7 +48,7 @@ The 1.5 hours saved per client isn't an estimate pulled from thin air. Here's wh
  
 At 10 new clients a month, that's 15 hours back. At 50, it's a part-time role eliminated.
 ---
-How It Works
+Client Journey
 ---
 
 ## How It Works
