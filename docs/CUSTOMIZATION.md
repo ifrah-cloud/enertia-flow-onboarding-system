@@ -1,222 +1,324 @@
 # Customization Guide
 
-This document lists every place you need to change something when implementing this system for a new business. Nothing else in the codebase needs to be touched for a standard implementation.
+This project is designed to be customized without modifying the core application logic. In most implementations, you'll only need to update credentials, branding, copy, and checklist content.
+
+Unless you're extending the application, avoid renaming database tables, column names, storage keys, or internal identifiers. These values are referenced throughout the application and changing them may require corresponding code updates.
 
 ---
 
-## File 1 — `src/lib/store.ts`
+# File 1 — `src/lib/store.ts`
 
-This is the only file with credentials and URLs. Change these values at the top:
+This file contains the application's external service configuration.
 
-| Line | Variable | What to put |
-|---|---|---|
-| ~2 | `SUPA_URL` | Your Supabase project URL |
-| ~3 | `SUPA_KEY` | Your Supabase anon public key |
-| ~8 | `GHL_WEBHOOK_URL` | Your completion workflow webhook URL from GHL |
-| ~10 | `HELP_MESSAGE_WEBHOOK_URL` | Your help/simulator workflow webhook URL from GHL |
+Update the following values before deployment:
 
-Also update the notification email addresses inside `sendCompletionEmail` if you're using them for logging purposes. Search for:
-
-```
-'ifrah@growthguild.us'
+```typescript
+const SUPA_URL = "https://YOUR_PROJECT_ID.supabase.co";
+const SUPA_KEY = "YOUR_SUPABASE_ANON_KEY";
+const GHL_WEBHOOK_URL = "YOUR_COMPLETION_WEBHOOK";
+const HELP_MESSAGE_WEBHOOK_URL = "YOUR_HELP_WEBHOOK";
 ```
 
-Replace with your team's email addresses. Note: actual email delivery is handled by GHL workflows, not this array directly.
+## What these values do
 
-**Everything else in store.ts is generic and should not need changes.**
+| Setting | Purpose |
+|----------|---------|
+| `SUPA_URL` | Connects the application to your Supabase project. |
+| `SUPA_KEY` | Allows the application to communicate with your Supabase database. |
+| `GHL_WEBHOOK_URL` | Triggered when a client completes onboarding. |
+| `HELP_MESSAGE_WEBHOOK_URL` | Receives help requests and simulator submissions. |
+
+For most deployments, these are the only values that need to be changed in this file.
 
 ---
 
-## File 2 — `src/components/GamifiedChecklist.tsx`
+# File 2 — `src/components/GamifiedChecklist.tsx`
 
-### The checklist content
+This file controls the onboarding experience, including the checklist, XP system, completion messages, and simulator placement.
 
-Find the `CHECKLIST_DATA` array and replace the items with your client's actual onboarding steps. Structure:
+---
+
+## Customize the Checklist
+
+The onboarding checklist is defined inside the `CHECKLIST_DATA` object.
+
+Each section contains one or more checklist items.
+
+Example:
 
 ```typescript
 export const CHECKLIST_DATA = [
   {
-    id: "section_id",        // unique, no spaces, used as database key
-    title: "Section Title",  // displayed as the section header
+    id: "profile",
+    title: "Set Up Your Profile",
     items: [
       {
-        id: "item_id",       // unique across ALL items, used as database key
-        text: "What the client needs to do",
-        points: 10,          // XP awarded when this item is checked
+        id: "p1",
+        text: "Complete your profile",
+        points: 10,
       },
-      // more items...
     ],
   },
-  // more sections...
 ];
 ```
 
-**Important rules:**
-- Never reuse an `id` — duplicates will cause checklist state bugs
-- Keep item IDs short and consistent (e.g. `p1`, `p2`, `ph1`, `ph2`, `c1`)
-- If you remove or rename items after clients have already started, their saved progress will reference the old IDs — existing clients won't be affected but their completed item list may contain IDs that no longer exist in the UI
-- The pipeline section (`id: "pipeline"`) is where the Pipeline Simulator form renders — keep this section ID as `"pipeline"` or update the reference in the JSX (`isPipeline` check)
-- The workflow simulator renders inside the section with `id: "contacts"` — change this if you want it elsewhere
+Each checklist item requires:
 
-### The encouragement messages
-
-Find the `ENCOURAGEMENTS` array and replace with your own copy. There are 8 messages mapping to 8 progress milestones (0%, ~14%, ~28%, ~43%, ~57%, ~71%, ~86%, 100%).
-
-### The completion confetti message
-
-Find the section with `System Online` heading text inside the confetti modal and update with your branding:
-
-```tsx
-<h2 className="font-display text-3xl font-bold uppercase mb-2">System Online</h2>
-<p className="text-muted-foreground mb-6">Your copy here...</p>
-```
+- A unique ID
+- Display text
+- XP value
 
 ---
 
-## File 3 — `src/pages/ClientLogin.tsx`
+### Item ID Guidelines
 
-### Branding
+Every checklist item must have a unique ID.
 
-The logo image URL:
+Recommended naming:
 
-```tsx
-// Find this line and replace the src with your logo URL
-<img src="https://your-logo-url.com/logo.png" alt="Your Agency" ... />
-```
+- `p1`
+- `p2`
+- `ph1`
+- `ph2`
+- `c1`
+- `o1`
 
-### Page copy
-
-Find and update:
-- `"Client Portal"` — the card title
-- `"Enter your details to access your onboarding checklist"` — the subtitle
-- `"Setting up your account…"` — the loading button text
-- `"Start Onboarding"` — the submit button text
-
-### Team access link
-
-The "Team Access" link at the bottom points to `/dashboard-login`. Update the label if needed:
-
-```tsx
-<Link to="/dashboard-login" ...>
-  <Shield className="w-3 h-3 mr-2" />
-  Team Access  {/* ← change this label */}
-</Link>
-```
+> **Important**
+>
+> Once your application is in use, avoid changing existing item IDs.
+>
+> Client progress is stored using these identifiers. Renaming or reusing IDs may cause previously completed tasks to appear incomplete.
 
 ---
 
-## File 4 — `src/pages/Dashboard.tsx`
+## Pipeline Simulator
 
-### Logo
+The Pipeline Simulator is rendered inside the checklist section with the ID:
 
-Find the `<img>` tag in the header and replace with your logo:
-
-```tsx
-<img src="https://your-logo-url.com/logo.png" alt="Your Agency" ... />
+```text
+pipeline
 ```
 
-### Header copy
+If you'd like the simulator to appear elsewhere, update the section identifier used by the component.
 
-Find and update:
-- `"Command Center"` — the header subtitle next to the logo
-- `"Team Progress Overview"` — the main page heading
-- `"Monitor engine initialization across all active personnel."` — the subheading
+---
 
-### Dashboard password
+## Workflow Simulator
 
-Open `src/pages/DashboardLogin.tsx` and find:
+The Workflow Simulator is rendered inside the checklist section with the ID:
+
+```text
+contacts
+```
+
+You may change this if you want the simulator to appear in another section.
+
+---
+
+## Progress Status Labels
+
+These labels appear throughout the application as the client's onboarding progresses.
+
+Example:
 
 ```typescript
-if (password === "enertia2024") {
+Initializing
+Booting Up
+Calibrating
+Fully Operational
 ```
 
-Replace `"enertia2024"` with a strong password of your choice.
+Feel free to replace these with terminology that matches your brand.
 
 ---
 
-## File 5 — `src/pages/DashboardLogin.tsx`
+## Encouragement Messages
 
-### Branding
+The checklist displays motivational messages as clients make progress.
 
-Same logo swap as other pages. Also update:
-- `"Command Center"` — the card title
-- `"Restricted access. Internal personnel only."` — the subtitle
-- `"Authorization Code"` — the input label
-- `"Authenticate"` — the button text
-
----
-
-## GHL Configuration
-
-### Custom menu link URL
-
-Replace `onboarding.enertiaflow.com` with your portal's domain:
-
-```
-https://onboarding.youragency.com/?location={{location.id}}&email={{user.email}}&name={{user.fullName}}
-```
-
-### Email templates
-
-In both GHL workflows, update:
-- The internal team email addresses (To field)
-- `"The Enertia Flow Team"` sign-off → your agency name
-- Any copy that mentions "Enertia Flow" by name
-
-See [GHL.md](./GHL.md) for the full email templates.
-
----
-
-## Optional Customizations
-
-These are not required but worth knowing about:
-
-### XP point values
-
-Each checklist item has a `points` value. The total XP displayed in the header is calculated automatically from the sum of all items. Adjust point values to weight more important steps higher.
-
-### Status labels
-
-The status labels that appear in the dashboard ("Initializing", "Booting Up", "Calibrating", "Fully Operational") are set in `GamifiedChecklist.tsx` inside the save effect:
+Example:
 
 ```typescript
-const status = progressPercent === 100 ? "Fully Operational"
-  : progressPercent > 50 ? "Calibrating"
-  : progressPercent > 0 ? "Booting Up" : "Initializing";
+System booting up.
+Good start.
+Halfway there.
+Almost finished.
+All systems go.
 ```
 
-Replace these with language that fits your brand.
-
-### Pipeline simulator placement
-
-The pipeline simulator form renders inside whatever checklist section has `id: "pipeline"`. If you want to rename that section or move the simulator, find this in `GamifiedChecklist.tsx`:
-
-```tsx
-{isPipeline && currentUserEmail && (
-  <div className="px-3 pb-2">
-    <PipelineSimulatorPanel ... />
-  </div>
-)}
-```
-
-### Workflow simulator placement
-
-Similarly, the workflow simulator is placed inside the section with `id: "contacts"`. Find:
-
-```tsx
-{category.id === 'contacts' && currentUserEmail && (
-```
-
-Change `'contacts'` to whatever section ID makes sense for your checklist.
+These messages can be customized to match your preferred tone of voice.
 
 ---
 
-## What NOT to Change
+## Completion Screen
 
-These things are wired deeply into the data layer — changing them requires also updating the database schema or multiple files simultaneously:
+The completion modal includes:
 
-- The Supabase table names (`clients`, `help_messages`, `pipeline_requests`, `workflow_requests`)
-- The `item_id = 'general'` convention for inbox threads
-- The column names in any table
-- The `store_updated` custom event name (used to sync the dashboard in real time)
-- The `currentUser` localStorage key (used by the checklist to identify the logged-in client)
+- Title
+- Description
+- Call-to-action text
+
+Update these values to reflect your own branding and onboarding experience.
+
+---
+
+# File 3 — `src/pages/ClientLogin.tsx`
+
+This file controls the client login page.
+
+---
+
+## Logo
+
+Replace the logo with your own.
+
+Example:
+
+```tsx
+<img src="YOUR_LOGO_URL" />
+```
+
+---
+
+## Branding
+
+Update the following text throughout the page:
+
+- Portal name
+- Welcome message
+- Subtitle
+- Button label
+- Loading message
+- Team login link
+
+These values control the client's first impression of your onboarding portal.
+
+---
+
+# File 4 — `src/pages/Dashboard.tsx`
+
+This file controls the internal dashboard.
+
+---
+
+## Logo
+
+Replace the default logo with your own branding.
+
+---
+
+## Dashboard Branding
+
+Customize:
+
+- Dashboard name
+- Page heading
+- Page description
+
+These changes affect the appearance of the admin dashboard only.
+
+---
+
+# File 5 — `src/pages/DashboardLogin.tsx`
+
+This file controls access to the internal dashboard.
+
+---
+
+## Authentication
+
+Replace the default password before deploying the application.
+
+For production environments, using a proper authentication provider is strongly recommended.
+
+---
+
+## Branding
+
+You can also customize:
+
+- Dashboard name
+- Login subtitle
+- Input label
+- Login button text
+
+---
+
+# GoHighLevel Configuration
+
+To automatically identify the logged-in client, configure your GoHighLevel Client Portal menu link to include dynamic client information.
+
+Example:
+
+```text
+https://onboarding.yourdomain.com/?location={{location.id}}&email={{user.email}}&name={{user.fullName}}
+```
+
+When a client opens the portal, the application automatically reads these values to:
+
+- Create the client record
+- Associate progress with the correct user
+- Save the GoHighLevel Location ID
+- Generate direct links back into the client's GoHighLevel account
+
+---
+
+## Email Branding
+
+If you're using GoHighLevel workflows, remember to update:
+
+- Internal notification email addresses
+- Agency name
+- Email signatures
+- Company references
+- Any default branding
+
+---
+
+# Internal Components
+
+The following values are referenced throughout the application.
+
+Unless you're extending the platform, they should remain unchanged.
+
+| Component | Reason |
+|-----------|--------|
+| Database table names | Referenced throughout the application. |
+| Database column names | Used by the application's data layer. |
+| `currentUser` localStorage key | Used to maintain client sessions. |
+| `store_updated` custom event | Used to refresh dashboard data. |
+| Existing checklist item IDs | Used to restore saved client progress. |
+| Reserved thread identifier (`general`) | Used to identify the general support conversation. |
+
+---
+
+# Designing Your XP System
+
+XP values are completely customizable.
+
+A useful approach is to assign points based on the effort required to complete each task.
+
+| Task Difficulty | Suggested XP |
+|-----------------|-------------:|
+| Quick task | 5–10 |
+| Standard setup | 15–25 |
+| Major milestone | 30–50 |
+
+Rather than assigning equal values to every task, consider rewarding items that require more effort or are commonly delayed. This creates a stronger sense of progression throughout the onboarding experience.
+
+---
+
+# Deployment Checklist
+
+Before launching your onboarding portal, verify the following:
+
+- Supabase credentials have been updated.
+-  Webhook URLs have been configured.
+-  Logos and branding have been replaced.
+-  Dashboard password has been changed.
+-  Checklist content has been customized.
+-  GoHighLevel menu link has been configured.
+-  Database tables have been created.
+-  A complete onboarding flow has been tested successfully.
+
+Once these steps are complete, your onboarding portal is ready for production.
