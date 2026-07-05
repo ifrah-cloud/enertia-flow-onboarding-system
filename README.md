@@ -52,7 +52,7 @@ How It Works
 ---
 
 ## How It Works
- 
+ <img width="894" height="1210" alt="image" src="https://github.com/user-attachments/assets/af9788d5-cbf5-4d18-bf7d-7f9ef8b73d80" /> 
 ### Client journey
  
 ```
@@ -138,7 +138,6 @@ Supabase Database
 | `src/components/GamifiedChecklist.tsx` | The full checklist UI — items, help panels, inbox, simulators. |
 | `src/pages/Dashboard.tsx` | Internal team dashboard. Reads live from Supabase. |
 | `src/pages/DashboardLogin.tsx` | Password-protected team login. |
-
 
 
 ---
